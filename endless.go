@@ -29,6 +29,11 @@ const (
 	STATE_TERMINATE
 )
 
+const (
+	ENV_ENDLESS_CONTINUE    = "ENDLESS_CONTINUE"
+	ENV_ENDLESS_SOCKETORDER = "ENDLESS_SOCKETORDER"
+)
+
 var (
 	runningServerReg     sync.RWMutex
 	runningServers       map[string]*endlessServer
@@ -90,8 +95,8 @@ func NewServer(addr string, handler http.Handler) (srv *endlessServer) {
 	runningServerReg.Lock()
 	defer runningServerReg.Unlock()
 
-	socketOrder = os.Getenv("GO_ENDLESS_SOCKETORDER")
-	isChild = os.Getenv("GO_ENDLESS_CONTINUE") != ""
+	socketOrder = os.Getenv(ENV_ENDLESS_SOCKETORDER)
+	isChild = os.Getenv(ENV_ENDLESS_CONTINUE) != ""
 
 	if len(socketOrder) > 0 {
 		for i, addr := range strings.Split(socketOrder, ",") {
@@ -445,10 +450,10 @@ func (srv *endlessServer) fork() (err error) {
 		orderArgs[socketPtrOffsetMap[srvPtr.Server.Addr]] = srvPtr.Server.Addr
 	}
 
-	env := append(os.Environ(), "GO_ENDLESS_CONTINUE=1")
+	env := append(os.Environ(), ENV_ENDLESS_CONTINUE+"=1")
 
 	if len(runningServers) > 1 {
-		env = append(env, fmt.Sprintf("GO_ENDLESS_SOCKETORDER=%s", strings.Join(orderArgs, ",")))
+		env = append(env, fmt.Sprintf("%s=%s", ENV_ENDLESS_SOCKETORDER, strings.Join(orderArgs, ",")))
 	}
 
 	// log.Println(files)
