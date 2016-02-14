@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
+	stdlog "log"
 	"net"
 	"net/http"
 	"os"
@@ -34,6 +34,12 @@ const (
 	ENV_ENDLESS_SOCKETORDER = "ENDLESS_SOCKETORDER"
 )
 
+type Logger interface {
+  Println(v... interface{})
+  Printf(format string, v... interface{})
+  Fatalf(format string, v... interface{})
+}
+
 var (
 	runningServerReg     sync.RWMutex
 	runningServers       map[string]*endlessServer
@@ -51,6 +57,8 @@ var (
 
 	hookableSignals []os.Signal
 )
+
+var log Logger = stdlog.New(os.Stdout, "endless", 0)
 
 func init() {
 	runningServerReg = sync.RWMutex{}
@@ -85,6 +93,10 @@ type endlessServer struct {
 	state            uint8
 	lock             *sync.RWMutex
 	BeforeBegin      func(add string)
+}
+
+func SetLogger(l Logger) {
+  log = l
 }
 
 /*
@@ -184,6 +196,20 @@ func (srv *endlessServer) setState(st uint8) {
 	srv.state = st
 }
 
+func (srv *endlessServer) waitTimeout(timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		srv.wg.Wait()
+	}()
+	select {
+	case <-c:
+		return true 
+	case <-time.After(timeout):
+		return false
+	}
+}
+
 /*
 Serve accepts incoming HTTP connections on the listener l, creating a new
 service goroutine for each. The service goroutines read requests and then call
@@ -199,7 +225,8 @@ func (srv *endlessServer) Serve() (err error) {
 	srv.setState(STATE_RUNNING)
 	err = srv.Server.Serve(srv.EndlessListener)
 	log.Println(syscall.Getpid(), "Waiting for connections to finish...")
-	srv.wg.Wait()
+	srv.waitTimeout(2 * time.Second)
+	log.Println(syscall.Getpid(), "Connections termiated")
 	srv.setState(STATE_TERMINATE)
 	return
 }
