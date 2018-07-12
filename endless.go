@@ -15,7 +15,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
 	// "github.com/fvbock/uds-go/introspect"
 )
 
@@ -35,9 +34,9 @@ const (
 )
 
 type Logger interface {
-  Println(v... interface{})
-  Printf(format string, v... interface{})
-  Fatalf(format string, v... interface{})
+	Println(v ...interface{})
+	Printf(format string, v ...interface{})
+	Fatalf(format string, v ...interface{})
 }
 
 var (
@@ -96,7 +95,7 @@ type endlessServer struct {
 }
 
 func SetLogger(l Logger) {
-  log = l
+	log = l
 }
 
 /*
@@ -204,7 +203,7 @@ func (srv *endlessServer) waitTimeout(timeout time.Duration) bool {
 	}()
 	select {
 	case <-c:
-		return true 
+		return true
 	case <-time.After(timeout):
 		return false
 	}
@@ -222,6 +221,7 @@ down the server.
 */
 func (srv *endlessServer) Serve() (err error) {
 	defer log.Println(syscall.Getpid(), "Serve() returning...")
+
 	srv.setState(STATE_RUNNING)
 	err = srv.Server.Serve(srv.EndlessListener)
 	log.Println(syscall.Getpid(), "Waiting for connections to finish...")
@@ -253,6 +253,7 @@ func (srv *endlessServer) ListenAndServe() (err error) {
 	srv.EndlessListener = newEndlessListener(l, srv)
 
 	if srv.isChild {
+		log.Println(syscall.Getpid(), "Terminating parent pid=", syscall.Getppid())
 		syscall.Kill(syscall.Getppid(), syscall.SIGTERM)
 	}
 
@@ -358,14 +359,14 @@ func (srv *endlessServer) handleSignals() {
 		sig = <-srv.sigChan
 		srv.signalHooks(PRE_SIGNAL, sig)
 		switch sig {
-		case syscall.SIGHUP:
-			log.Println(pid, "Received SIGHUP. forking.")
+		case syscall.SIGUSR1:
+			log.Println(pid, "Received USR1, forking.")
 			err := srv.fork()
 			if err != nil {
 				log.Println("Fork err:", err)
 			}
-		case syscall.SIGUSR1:
-			log.Println(pid, "Received SIGUSR1.")
+		case syscall.SIGHUP:
+			log.Println(pid, "Received SIGHUP.")
 		case syscall.SIGUSR2:
 			log.Println(pid, "Received SIGUSR2.")
 			srv.hammerTime(0 * time.Second)
